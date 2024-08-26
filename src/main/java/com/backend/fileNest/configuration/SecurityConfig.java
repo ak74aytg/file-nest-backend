@@ -38,7 +38,8 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/test/**").authenticated()
                         .requestMatchers("/test/admin").hasRole("ADMIN")
-                        .anyRequest().authenticated()
+                        .requestMatchers("/documents/**").authenticated()
+                        .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .httpBasic(Customizer.withDefaults());
