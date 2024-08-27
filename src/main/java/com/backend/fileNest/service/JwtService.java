@@ -13,7 +13,7 @@ import java.util.function.Function;
 
 @Service
 public class JwtService {
-    public final String secreteKey = "akshayistjfffffffffffffffksssssslfdsjsl;dfjkjlksdfjlsdkfjhegreat";
+    public final String secreteKey = "thisisthefilenestapplicationcreatedbyakshaypantthegreatestdeveloperoftheworld";
     public String generateToken(String username) {
         HashMap<String, Object> claims = new HashMap<>();
         return Jwts.builder()
@@ -21,7 +21,7 @@ public class JwtService {
                 .add(claims)
                 .subject(username)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis()+60*60*60))
+                .expiration(new Date(System.currentTimeMillis()+ 365L *24*60*60*1000))
                 .and()
                 .signWith(generateKey())
                 .compact();

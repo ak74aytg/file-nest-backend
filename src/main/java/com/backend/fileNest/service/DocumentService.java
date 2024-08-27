@@ -11,6 +11,10 @@ import java.util.List;
 
 public interface DocumentService {
     List<DocumentResponse> getAllDocument(String email);
-    Resource loadFileAsResource(String fileId);
-    String storeFile(MultipartFile file, String email) throws Exception;
+    Resource loadFileAsResource(String fileId, String email);
+    String storeFile(MultipartFile file, List<String> tags, String email);
+
+    String deleteDocument(String fileId, String email);
+
+    List<DocumentResponse> getDocumentByTags(List<String> tags, String email);
 }
