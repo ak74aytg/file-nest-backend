@@ -6,16 +6,19 @@ import com.backend.fileNest.model.User;
 import com.backend.fileNest.repository.DocumentRepository;
 import com.backend.fileNest.repository.UserRepository;
 import com.backend.fileNest.response.DocumentResponse;
+import com.backend.fileNest.response.TagsResponse;
 import com.backend.fileNest.service.DocumentService;
+import com.backend.fileNest.service.OcrService;
 import jakarta.annotation.PostConstruct;
+import net.sourceforge.tess4j.TesseractException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,7 +33,10 @@ public class DocumentServiceImpl implements DocumentService {
     private DocumentRepository documentRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private OcrService ocrService;
     private final Path rootLocation = Paths.get("uploads");
+
 
 
     @PostConstruct
@@ -84,7 +90,7 @@ public class DocumentServiceImpl implements DocumentService {
     public String storeFile(MultipartFile file, List<String> tags, String email){
         User user = userRepository.findByEmail(email);
         String filename = file.getOriginalFilename()!=null ?
-                file.getOriginalFilename() :
+                user.getEmail()+file.getOriginalFilename() :
                 "document_"+System.currentTimeMillis();
         try {
             Files.copy(file.getInputStream(),
@@ -117,6 +123,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .stream()
                     .filter(document -> document.getId().equals(fileId))
                     .toArray()[0];
+            System.out.println(doc.getId());
             Path filePath = Paths.get(doc.getFile_url());
             Files.deleteIfExists(filePath);
             documentRepository.delete(doc);
@@ -131,7 +138,10 @@ public class DocumentServiceImpl implements DocumentService {
     public List<DocumentResponse> getDocumentByTags(List<String> tags, String email) {
         User user = userRepository.findByEmail(email);
         List<Document> docs = documentRepository.findByUploadedBy(user);
-
+        if (docs == null || docs.isEmpty()) {
+            // Handle case where no documents are found
+            return new ArrayList<>();
+        }
         // Filter documents that contain all the specified tags
         List<Document> filteredDocs = docs.stream()
                 .filter(doc -> new HashSet<>(doc.getMetaData().getTags()).containsAll(tags))
@@ -145,4 +155,90 @@ public class DocumentServiceImpl implements DocumentService {
                         .build())
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<TagsResponse> getAllTags(String email) {
+        User user = userRepository.findByEmail(email);
+        List<Document> docs = documentRepository.findByUploadedBy(user);
+        if (docs == null || docs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Map<String, Integer> tagFrequency;
+        tagFrequency = new HashMap<>();
+        for (Document doc :
+                docs) {
+            List<String> tagList = doc.getMetaData().getTags();
+            for (String tag :
+                    tagList) {
+                tagFrequency.put(tag, tagFrequency.getOrDefault(tag, 0) + 1);
+            }
+        }
+        if(tagFrequency.isEmpty()) return new ArrayList<>();
+        List<Map.Entry<String, Integer>> sortedTags = new ArrayList<>(tagFrequency.entrySet());
+        sortedTags.sort((entry1, entry2) -> entry2.getValue().compareTo(entry1.getValue()));
+        int counter = 3;
+        int others = 0;
+        List<TagsResponse> response = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : sortedTags) {
+            if(counter!=0){
+                TagsResponse tag = TagsResponse.builder()
+                        .name(entry.getKey())
+                        .file_with_tag(entry.getValue())
+                        .build();
+                response.add(tag);
+                counter--;
+            }else{
+                others+=entry.getValue();
+            }
+        }
+        response.add(TagsResponse.builder().file_with_tag(others).name("others").build());
+        return response;
+    }
+
+    @Override
+    public String extractTexts(String fileId, String email) {
+        User user = userRepository.findByEmail(email);
+        Optional<Document> optionalDocument = documentRepository.findById(fileId);
+        if (optionalDocument.isEmpty()) {
+            throw new RuntimeException("Document not found!");
+        }
+        Document document = optionalDocument.get();
+        if (!document.getUploadedBy().getId().equals(user.getId())) {
+            throw new RuntimeException("Not allowed to access this document!");
+        }
+        if(document.getOcr_text()!=null){
+            return "completed";
+        }
+        Path filePath = Paths.get(document.getFile_url());
+        File file = filePath.toFile();
+        String extractedText;
+        try {
+            extractedText = ocrService.extractTextFromFile(file);
+        } catch (IOException | TesseractException e) {
+            throw new RuntimeException("Failed to extract text from file", e);
+        }
+        document.setOcr_text(extractedText);
+        documentRepository.save(document);
+        return extractedText;
+    }
+
+
+
+    @Override
+    public String getFileUri(String fileId, String email) {
+        User user = userRepository.findByEmail(email);
+        List<Document> documents = documentRepository.findByUploadedBy(user);
+        Document doc = documents.stream()
+                .filter(document -> document.getId().equals(fileId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Document not found"));
+
+        // Assuming your API is hosted on "http://localhost:8080"
+        String baseUrl = "http://localhost:8080/file-nest";
+        String downloadUri = baseUrl + "/documents/" + fileId;
+
+        return downloadUri;
+    }
+
+
 }

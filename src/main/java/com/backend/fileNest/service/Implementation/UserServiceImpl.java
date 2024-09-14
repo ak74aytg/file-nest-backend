@@ -86,4 +86,9 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("wrong email/password!");
         }
     }
+
+    @Override
+    public String getUser(String email) {
+        return userRepository.findByEmail(email).getUsername();
+    }
 }

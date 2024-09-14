@@ -22,6 +22,7 @@ public class Document {
     private User uploadedBy;
     private String file_url;
     private MetaData metaData;
+    private String ocr_text;
     @CreatedDate
     private Date create_at;
     @LastModifiedDate
