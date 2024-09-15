@@ -44,12 +44,16 @@ public class DocumentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<DocumentResponse>> getAllFiles(Principal principal){
+    public ResponseEntity<List<DocumentResponse>> getAllFiles(
+            @RequestParam(required = false, defaultValue = "5") Integer pageSize,
+            @RequestParam(required = false, defaultValue = "0") Integer pageNumber,
+            Principal principal) {
+
         String email = principal.getName();
-        List<DocumentResponse> documents = documentService.getAllDocument(email);
-        Collections.reverse(documents); // Reverse the list
+        List<DocumentResponse> documents = documentService.getAllDocument(email, pageSize, pageNumber);
         return ResponseEntity.ok(documents);
     }
+
 
     @DeleteMapping
     public ResponseEntity<String> deleteFile(@RequestParam("file_id") String file_id, Principal principal){
@@ -156,13 +160,20 @@ public class DocumentController {
         String email = principal.getName();
         try {
             String response = documentService.extractTexts(file_id, email);
-            if (response.equals("completed")){
-                return ResponseEntity.status(HttpStatus.ALREADY_REPORTED).body("done");
-            }
             return ResponseEntity.ok(response);
         }catch (RuntimeException e){
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).body(e.getMessage());
         }
+    }
+
+    @GetMapping("/ocr")
+    @PermitAll
+    public ResponseEntity<String> OcrStatus(@RequestParam("file_id") String file_id){
+        String response = documentService.getOcrStatus(file_id);
+        if(response.equals("completed")){
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(response);
     }
 }

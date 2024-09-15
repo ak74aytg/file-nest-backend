@@ -14,6 +14,10 @@ import net.sourceforge.tess4j.TesseractException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -49,9 +53,26 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public List<DocumentResponse> getAllDocument(String email) {
+    public List<DocumentResponse> getAllDocument(String email, Integer pageSize, Integer pageNumber) {
+
+        Pageable pageable = PageRequest
+                .of(pageNumber,
+                        pageSize,
+                        Sort.by(Sort.Direction.DESC, "metaData.uploaded_at")
+                );
+
+        Page<Document> documentPage = documentRepository.findAll(pageable);
+
         User user = userRepository.findByEmail(email);
-        List<Document> docs = documentRepository.findByUploadedBy(user);
+
+        List<Document> docs = documentPage.stream()
+                .filter(
+                        (document ->
+                                document.getUploadedBy().getId().equals(user.getId())
+                        )
+                )
+                .toList();
+
         List<DocumentResponse> response = new ArrayList<>();
         for (Document doc : docs){
             response.add(DocumentResponse.builder()
@@ -135,6 +156,11 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    public String deleteDocuments(List<String> fileIds, String email) {
+        return null;
+    }
+
+    @Override
     public List<DocumentResponse> getDocumentByTags(List<String> tags, String email) {
         User user = userRepository.findByEmail(email);
         List<Document> docs = documentRepository.findByUploadedBy(user);
@@ -206,9 +232,6 @@ public class DocumentServiceImpl implements DocumentService {
         if (!document.getUploadedBy().getId().equals(user.getId())) {
             throw new RuntimeException("Not allowed to access this document!");
         }
-        if(document.getOcr_text()!=null){
-            return "completed";
-        }
         Path filePath = Paths.get(document.getFile_url());
         File file = filePath.toFile();
         String extractedText;
@@ -222,6 +245,14 @@ public class DocumentServiceImpl implements DocumentService {
         return extractedText;
     }
 
+    @Override
+    public String getOcrStatus(String fileId) {
+        Optional<Document> optionalDocument = documentRepository.findById(fileId);
+        if (optionalDocument.get().getOcr_text()==null){
+            return "incomplete";
+        }
+        return "completed";
+    }
 
 
     @Override
