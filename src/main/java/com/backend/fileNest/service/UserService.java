@@ -12,4 +12,6 @@ public interface UserService {
     String delete(String email);
 
     AuthResponse login(LoginRequest request);
+
+    String getUser(String name);
 }
