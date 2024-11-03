@@ -12,4 +12,5 @@ public class DocumentResponse {
     private String file_id;
     private String title;
     private MetaData metaData;
+    private String ocrText;
 }

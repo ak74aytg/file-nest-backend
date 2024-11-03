@@ -32,8 +32,8 @@ public class OcrService {
         g.drawImage(bufferedImage, 0, 0, null);
         g.dispose();
         Tesseract tesseract = new Tesseract();
-        tesseract.setDatapath("C:\\Program Files\\Tesseract-OCR\\tessdata"); // Configure the path
-        tesseract.setLanguage("eng+hin"); // Set language
+        tesseract.setDatapath("/usr/share/tesseract-ocr/4.00/tessdata");
+        tesseract.setLanguage("eng"); // Set language
         return tesseract.doOCR(grayImage);
     }
 

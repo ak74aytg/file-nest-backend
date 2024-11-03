@@ -93,7 +93,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .stream()
                     .filter(document -> document.getId().equals(fileId))
                     .toArray()[0];
-            String filename = doc.getTitle();
+            String filename = user.getEmail()+doc.getTitle();
             Path file = rootLocation.resolve(filename);
             Resource resource = new UrlResource(file.toUri());
 
@@ -161,26 +161,40 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public List<DocumentResponse> getDocumentByTags(List<String> tags, String email) {
-        User user = userRepository.findByEmail(email);
-        List<Document> docs = documentRepository.findByUploadedBy(user);
-        if (docs == null || docs.isEmpty()) {
-            // Handle case where no documents are found
-            return new ArrayList<>();
+    public List<DocumentResponse> searchDocument(String searchText, String fileType, Date startDate, Date endDate, List<String> tags, String email) {
+        if (startDate == null) {
+            startDate = new Date(System.currentTimeMillis() - (365L * 24 * 60 * 60 * 1000));
         }
-        // Filter documents that contain all the specified tags
-        List<Document> filteredDocs = docs.stream()
-                .filter(doc -> new HashSet<>(doc.getMetaData().getTags()).containsAll(tags))
+        if (endDate == null) {
+            endDate = new Date();
+        }
+        if (tags == null) {
+            tags = new ArrayList<>();
+        }
+
+        List<Document> documents = documentRepository.searchDocuments(searchText, fileType, startDate, endDate, tags);
+
+        User user = userRepository.findByEmail(email);
+
+        List<Document> docs = documents.stream()
+                .filter(
+                        (document ->
+                                document.getUploadedBy().getId().equals(user.getId())
+                        )
+                )
                 .toList();
 
-        return filteredDocs.stream()
-                .map(doc -> DocumentResponse.builder()
-                        .file_id(doc.getId())
-                        .metaData(doc.getMetaData())
-                        .title(doc.getTitle())
-                        .build())
-                .collect(Collectors.toList());
+        List<DocumentResponse> response = new ArrayList<>();
+        for (Document doc : docs){
+            response.add(DocumentResponse.builder()
+                    .file_id(doc.getId())
+                    .metaData(doc.getMetaData())
+                    .title(doc.getTitle())
+                    .build());
+        }
+        return response;
     }
+
 
     @Override
     public List<TagsResponse> getAllTags(String email) {
@@ -271,5 +285,20 @@ public class DocumentServiceImpl implements DocumentService {
         return downloadUri;
     }
 
+
+    @Override
+    public DocumentResponse getFileByID(String fileId, String email){
+        User user = userRepository.findByEmail(email);
+        Optional<Document> optionalDocument = documentRepository.findByUploadedByAndId(user, fileId);
+        Document document = optionalDocument.orElse(null);
+//        System.out.println(document);
+        assert document != null;
+        return DocumentResponse.builder()
+                .file_id(document.getId())
+                .metaData(document.getMetaData())
+                .title(document.getTitle())
+                .ocrText(document.getOcr_text())
+                .build();
+    }
 
 }
